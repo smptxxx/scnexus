@@ -1,0 +1,297 @@
+#!/bin/bash
+set -euo pipefail
+
+# ============ BASIC SETUP ============
+export LC_ALL='en_US.UTF-8'
+export LANG='en_US.UTF-8'
+export LANGUAGE='en_US.UTF-8'
+export LC_CTYPE='en_US.utf8'
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
+BLUE='\033[0;34m'; PURPLE='\033[0;35m'; CYAN='\033[0;36m'
+LIGHT='\033[0;37m'; NC='\033[0m'
+WH='\033[1;37m'
+
+nama="  SCRIPT TUNNEL "
+
+# Telegram (optional)
+CHATID="$(grep -E "^#bot# " "/etc/bot/.bot.db" 2>/dev/null | awk '{print $3}' | head -n1 || true)"
+KEY="$(grep -E "^#bot# " "/etc/bot/.bot.db" 2>/dev/null | awk '{print $2}' | head -n1 || true)"
+TIME="10"
+URL="https://api.telegram.org/bot${KEY}/sendMessage"
+
+# Server info (optional)
+IP="$(curl -sS ipv4.icanhazip.com 2>/dev/null || echo "N/A")"
+ISP="$(cat /etc/xray/isp 2>/dev/null || echo "N/A")"
+CITY="$(cat /etc/xray/city 2>/dev/null || echo "N/A")"
+domain="$(cat /etc/xray/domain 2>/dev/null || echo "$IP")"
+
+mkdir -p /etc/xray/noobz/akun >/dev/null 2>&1 || true
+touch /etc/xray/noob 2>/dev/null || true
+
+# ============ HELPERS ============
+bar() { echo -e "${RED}╭═══════════════════════════════════════════════════╮${NC}"; }
+bar2(){ echo -e "${RED}╰═══════════════════════════════════════════════════╯${NC}"; }
+
+ensure_service() {
+  if ! systemctl is-active --quiet noobzvpns; then
+    systemctl start noobzvpns >/dev/null 2>&1 || true
+    sleep 1
+  fi
+}
+
+# exp days -> unix timestamp
+# days=0 => "unlimited" => set 10 years (aman, ga overflow)
+calc_expired_ts() {
+  local days="$1"
+  if [[ "$days" == "0" ]]; then
+    date -d "+3650 days" +%s
+  else
+    date -d "+${days} days" +%s
+  fi
+}
+
+send_tg() {
+  local text="$1"
+  if [[ -n "${CHATID:-}" && -n "${KEY:-}" ]]; then
+    curl -s --max-time "$TIME" \
+      -d "chat_id=$CHATID&disable_web_page_preview=1&text=$text&parse_mode=html" \
+      "$URL" >/dev/null 2>&1 || true
+  fi
+}
+
+pause_back() {
+  echo ""
+  read -n 1 -s -r -p " Press Enter for Back to Manage"
+  NOB
+}
+
+# ============ ACTIONS ============
+create() {
+  clear
+  bar
+  echo -e "${RED}│ ${NC}${WH}                  • ADD NOOBZ USER •                 ${NC}${RED} │${NC}"
+  bar2
+  echo ""
+
+  read -r -p "Username : " user
+  read -r -p "Password : " pass
+  read -r -p "Exp (day) [0=unlimited] : " exp
+  read -r -p "Limit Device [0=unlimited] : " dev
+
+  [[ -z "${user}" || -z "${pass}" ]] && { echo -e "${RED}❌ username/password kosong${NC}"; sleep 1; return; }
+  [[ "${exp}" =~ ^[0-9]+$ ]] || { echo -e "${RED}❌ exp harus angka${NC}"; sleep 1; return; }
+  [[ "${dev}" =~ ^[0-9]+$ ]] || { echo -e "${RED}❌ device harus angka${NC}"; sleep 1; return; }
+
+  ensure_service
+
+  expired_ts="$(calc_expired_ts "$exp")"
+  exp_human="$(date -d "@${expired_ts}" "+%Y-%m-%d")"
+
+  # add user (retry once if fail)
+  if [[ "$dev" -gt 0 ]]; then
+    noobzvpns add "$user" --password "$pass" --expired "$expired_ts" --devices "$dev" \
+      || (systemctl restart noobzvpns >/dev/null 2>&1; sleep 1; noobzvpns add "$user" --password "$pass" --expired "$expired_ts" --devices "$dev")
+  else
+    noobzvpns add "$user" --password "$pass" --expired "$expired_ts" \
+      || (systemctl restart noobzvpns >/dev/null 2>&1; sleep 1; noobzvpns add "$user" --password "$pass" --expired "$expired_ts")
+  fi
+
+  # save local list
+  sed -i "/^### ${user} /d" /etc/xray/noob 2>/dev/null || true
+  echo "### ${user} ${pass} ${exp}" >> /etc/xray/noob
+
+  clear
+  echo -e "${GREEN}◇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◇${NC}"
+  echo -e "${GREEN}| \E[44;1;39m      °NOOBZVPN'S ACCOUNT°      \E[0m|${NC}"
+  echo -e "${GREEN}◇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◇${NC}"
+  echo ""
+  echo -e "DOMAIN      : ${domain}"
+  echo -e "ISP/CITY    : ${ISP} ${CITY}"
+  echo -e "USERNAME    : ${user}"
+  echo -e "PASSWORD    : ${pass}"
+  echo -e "DEV LIMIT   : ${dev}"
+  echo -e "EXP DAYS    : ${exp} day"
+  echo -e "EXP DATE    : ${exp_human}"
+  echo -e "${GREEN}◇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◇${NC}"
+  echo ""
+
+  # Telegram notify (optional)
+  TEXT="
+<code>◇━━━━━━━━━━━━━━◇</code>
+<code> CREATE NOOBZVPNS</code>
+<code>◇━━━━━━━━━━━━━━◇</code>
+<code>DOMAIN   :</code> <code>${domain}</code>
+<code>ISP      :</code> <code>${ISP} ${CITY}</code>
+<code>USERNAME :</code> <code>${user}</code>
+<code>PASSWORD :</code> <code>${pass}</code>
+<code>DEVICES  :</code> <code>${dev}</code>
+<code>EXP DAY  :</code> <code>${exp}</code>
+<code>EXP DATE :</code> <code>${exp_human}</code>
+<code>◇━━━━━━━━━━━━━━◇</code>
+<i>Succes Create This User...</i>"
+  send_tg "$TEXT"
+
+  # print detail from noobz (if available)
+  noobzvpns print "$user" 2>/dev/null || true
+
+  pause_back
+}
+
+delete_user() {
+  clear
+  bar
+  echo -e "${RED}│ ${NC}${WH}                 • DELETE NOOBZ USER •               ${NC}${RED} │${NC}"
+  bar2
+  echo ""
+  echo -e "${YELLOW}List (local):${NC}"
+  grep -E "^### " "/etc/xray/noob" 2>/dev/null | awk '{print $2"  "$3"  (days:"$4")"}' | nl -s ') ' || true
+  echo ""
+
+  read -r -p "username : " user
+  [[ -z "${user}" ]] && return
+
+  ensure_service
+  noobzvpns remove "$user" || true
+  sed -i "/^### ${user} /d" /etc/xray/noob 2>/dev/null || true
+
+  clear
+  echo -e "${GREEN}✅ USER ${user} deleted${NC}"
+
+  TEXT="
+<code>◇━━━━━━━━━━━━━━◇</code>
+<code> DELETE NOOBZVPNS</code>
+<code>◇━━━━━━━━━━━━━━◇</code>
+<code>DOMAIN   :</code> <code>${domain}</code>
+<code>ISP      :</code> <code>${ISP} ${CITY}</code>
+<code>USERNAME :</code> <code>${user}</code>
+<code>◇━━━━━━━━━━━━━━◇</code>
+<i>Succes Delete This User...</i>"
+  send_tg "$TEXT"
+
+  pause_back
+}
+
+renew() {
+  clear
+  bar
+  echo -e "${RED}│ ${NC}${WH}                  • RENEW NOOBZ USER •               ${NC}${RED} │${NC}"
+  bar2
+  echo ""
+
+  read -r -p "username : " user
+  read -r -p "add days (0=unlimited) : " exp
+  [[ -z "${user}" ]] && return
+  [[ "${exp}" =~ ^[0-9]+$ ]] || { echo -e "${RED}❌ exp harus angka${NC}"; sleep 1; return; }
+
+  ensure_service
+  expired_ts="$(calc_expired_ts "$exp")"
+
+  # renew (retry)
+  noobzvpns renew "$user" --expired "$expired_ts" \
+    || (systemctl restart noobzvpns >/dev/null 2>&1; sleep 1; noobzvpns renew "$user" --expired "$expired_ts")
+
+  exp_human="$(date -d "@${expired_ts}" "+%Y-%m-%d")"
+  echo -e "${GREEN}✅ renew success: ${user} -> ${exp_human}${NC}"
+
+  pause_back
+}
+
+lock_user() {
+  clear
+  bar
+  echo -e "${RED}│ ${NC}${WH}                  • LOCK NOOBZ USER •                ${NC}${RED} │${NC}"
+  bar2
+  echo ""
+  read -r -p "username : " user
+  [[ -z "${user}" ]] && return
+  ensure_service
+  noobzvpns block "$user" || true
+  echo -e "${GREEN}✅ locked: ${user}${NC}"
+  pause_back
+}
+
+unlock_user() {
+  clear
+  bar
+  echo -e "${RED}│ ${NC}${WH}                • UNLOCK NOOBZ USER •                ${NC}${RED} │${NC}"
+  bar2
+  echo ""
+  read -r -p "username : " user
+  [[ -z "${user}" ]] && return
+  ensure_service
+  noobzvpns unblock "$user" || true
+  echo -e "${GREEN}✅ unlocked: ${user}${NC}"
+  pause_back
+}
+
+show_all() {
+  clear
+  bar
+  echo -e "${RED}│ ${NC}${WH}                 • SHOW ALL NOOBZ USER •             ${NC}${RED} │${NC}"
+  bar2
+  echo ""
+  ensure_service
+  noobzvpns print-all || true
+  pause_back
+}
+
+remove_all() {
+  clear
+  bar
+  echo -e "${RED}│ ${NC}${WH}                 • REMOVE ALL NOOBZ USER •           ${NC}${RED} │${NC}"
+  bar2
+  echo ""
+  read -r -p "Hapus semua user? (Y/N): " choice
+  if [[ "${choice}" == "Y" || "${choice}" == "y" ]]; then
+    ensure_service
+    # coba opsi bawaan (kalau tersedia)
+    if noobzvpns opts delete_all >/dev/null 2>&1; then
+      noobzvpns opts delete_all || true
+    else
+      # fallback: loop dari list local file
+      grep -E "^### " "/etc/xray/noob" 2>/dev/null | awk '{print $2}' | while read -r u; do
+        [[ -n "$u" ]] && noobzvpns remove "$u" >/dev/null 2>&1 || true
+      done
+    fi
+    : > /etc/xray/noob || true
+    echo -e "${GREEN}✅ semua user dihapus${NC}"
+  else
+    echo -e "${YELLOW}dibatalkan${NC}"
+  fi
+  pause_back
+}
+
+# ============ MENU ============
+NOB() {
+  clear
+  bar
+  echo -e "${RED}│ ${NC}${WH}                 • NOOBZ PANEL MENU (NEW) •          ${NC}${RED} │${NC}"
+  bar2
+  bar
+  echo -e "${RED}│ ${NC}${WH}[01]${NC} ADD USER       ${WH}[04]${NC} DELETE USER     ${RED}│${NC}"
+  echo -e "${RED}│ ${NC}${WH}[02]${NC} SHOW ALL       ${WH}[05]${NC} LOCK USER       ${RED}│${NC}"
+  echo -e "${RED}│ ${NC}${WH}[03]${NC} RENEW USER     ${WH}[06]${NC} UNLOCK USER     ${RED}│${NC}"
+  echo -e "${RED}│ ${NC}${WH}[00]${NC} GO BACK        ${WH}[07]${NC} REMOVE ALL      ${RED}│${NC}"
+  bar2
+  echo -e "${RED}╭═════════════════════ ${WH}• BY • ${NC}${RED}══════════════════════╮${NC}"
+  echo -e "${RED}${NC}          ${WH}      • ${nama} •                 ${RED} ${NC}"
+  echo -e "${RED}╰═══════════════════════════════════════════════════╯${NC}"
+  echo ""
+  echo -ne " ${WH}Select menu : ${NC}"
+  read -r opt
+
+  case "$opt" in
+    01|1) create ;;
+    02|2) show_all ;;
+    03|3) renew ;;
+    04|4) delete_user ;;
+    05|5) lock_user ;;
+    06|6) unlock_user ;;
+    07|7) remove_all ;;
+    00|0) clear; command -v menu >/dev/null 2>&1 && menu || exit 0 ;;
+    *) NOB ;;
+  esac
+}
+
+NOB

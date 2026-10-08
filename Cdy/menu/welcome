@@ -1,0 +1,256 @@
+#!/bin/bash
+REDBLD="\033[0m\033[91;1m"
+Green="\e[92;1m"
+RED="\033[1;31m"
+YELLOW="\033[33m"
+BLUE="\033[36m"
+FONT="\033[0m"
+GREENBG="\033[42;37m"
+REDBG="\033[41;37m"
+z="\033[1;96m"
+NC='\e[0m'
+######################################
+
+# Biar ga nge-lag: semua network dikasih timeout + dipanggil 1x aja
+MYIP="$(curl -4 -fsS --max-time 3 ipv4.icanhazip.com 2>/dev/null || echo "-")"
+today="$(date +%Y-%m-%d)"
+
+# local file (cepet)
+ISP="$(cat /etc/xray/isp 2>/dev/null)"
+CITY="$(cat /etc/xray/city 2>/dev/null)"
+domain="$(cat /etc/xray/domain 2>/dev/null)"
+RAM="$(free -m | awk 'NR==2 {print $2}')"
+MODEL="$(grep -w ID /etc/os-release 2>/dev/null | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g')"
+
+clear
+
+######################################
+# // USERNAME IZIN IPP (ambil 1x, parse 2 field)
+izin_data="$(curl -fsS --max-time 5 https://raw.githubusercontent.com/smptxxx/izinsc/main/ip 2>/dev/null || true)"
+line_izin="$(printf '%s\n' "$izin_data" | grep -m1 -w "$MYIP" || true)"
+
+username="$(printf '%s\n' "$line_izin" | awk '{print $2}')"
+valid="$(printf '%s\n' "$line_izin" | awk '{print $3}')"
+
+echo "$username" > /usr/bin/user
+echo "$valid" > /usr/bin/e
+
+clear
+######################################
+# // DETAIL ORDER IZIN IP
+oid=$(cat /usr/bin/ver 2>/dev/null)
+exp=$(cat /usr/bin/e 2>/dev/null)
+
+######################################
+clear
+# // DAYS LEFT
+d1=$(date -d "$valid" +%s 2>/dev/null || echo 0)
+d2=$(date -d "$today" +%s 2>/dev/null || echo 0)
+certifacate=$(((d1 - d2) / 86400))
+if [[ $certifacate -le 0 ]]; then
+masaaktif="EXPAIRED"
+else
+masaaktif="${certifacate} Day"
+fi
+
+clear
+######################################
+# // GETTINGS SYSTEM (pake is-active biar cepet, ga spawn status panjang)
+ssh_service="$(systemctl is-active ssh 2>/dev/null || echo inactive)"
+dropbear_service="$(systemctl is-active dropbear 2>/dev/null || echo inactive)"
+haproxy_service="$(systemctl is-active haproxy 2>/dev/null || echo inactive)"
+xray_service="$(systemctl is-active xray 2>/dev/null || echo inactive)"
+nginx_service="$(systemctl is-active nginx 2>/dev/null || echo inactive)"
+
+clear
+######################################
+# // RUNNING SSH
+######################################
+if [[ $ssh_service == "active" ]]; then
+   status_ssh="\033[92;1mON${NC}"
+else
+   status_ssh="\033[91;1mOFF${NC}"
+fi
+
+######################################
+# // RUNNING WEBSOCKET
+######################################
+ssh_ws="$(systemctl is-active ws 2>/dev/null || echo inactive)"
+if [[ $ssh_ws == "active" ]]; then
+    status_ws_epro="\033[92;1mON${NC}"
+else
+    status_ws_epro="\033[91;1mOFF${NC}"
+fi
+
+######################################
+# RUNNING HAPROXY
+######################################
+if [[ $haproxy_service == "active" ]]; then
+   status_haproxy="\033[92;1mON${NC}"
+else
+   status_haproxy="\033[91;1mOFF${NC}"
+fi
+
+######################################
+# RUNNING XRAY
+######################################
+if [[ $xray_service == "active" ]]; then
+   status_xray="\033[92;1mON${NC}"
+else
+   status_xray="\033[91;1mOFF${NC}"
+fi
+
+######################################
+# RUNNING NGINX
+######################################
+if [[ $nginx_service == "active" ]]; then
+   status_nginx="\033[92;1mON${NC}"
+else
+   status_nginx="\033[91;1mOFF${NC}"
+fi
+
+######################################
+# RUNNING DROPBEAR
+######################################
+if [[ $dropbear_service == "active" ]]; then
+   status_dropbear="\033[92;1mGOOD${NC}"
+else
+   status_dropbear="\033[91;1mCRAZY${NC}"
+fi
+
+# \\ Vless account //
+vlx=$(grep -c -E "^#& " "/etc/xray/config.json" 2>/dev/null)
+let vla=$vlx/2
+# \\ Vmess account //
+vmc=$(grep -c -E "^### " "/etc/xray/config.json" 2>/dev/null)
+let vma=$vmc/2
+# \\ Trojan account //
+ssh1="$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd | wc -l)"
+trx=$(grep -c -E "^#! " "/etc/xray/config.json" 2>/dev/null)
+let trb=$trx/2
+# \\ shadowsocks account //
+ssx=$(grep -c -E "^#!# " "/etc/xray/config.json" 2>/dev/null)
+let ssa=$ssx/2
+
+kemarin=$(date -d "-1 days" +"%m-%d")
+hariini=$(date -d "0 days" +"%m-%d")
+kemarin1=$(date -d "-1 days" +"%m/%d")
+hariini1=$(date -d "0 days" +"%m/%d")
+bulan=$(date +"%b '%y")
+bulan1=$(date +"%Y-%m")
+
+# vnstat dipanggil 1x aja biar ga berat
+vn_d="$(vnstat -d 2>/dev/null || true)"
+vn_m="$(vnstat -m 2>/dev/null || true)"
+
+kemarin2=$(printf '%s\n' "$vn_d" | grep -w "${kemarin}"  | awk '{print $8" "substr ($9 ,1 ,1) substr ($9 ,3 ,1)}')
+kemarin3=$(printf '%s\n' "$vn_d" | grep -w "${kemarin1}" | awk '{print $8" "substr ($9 ,1 ,1) substr ($9 ,3 ,1)}')
+if [[ $kemarin2 == "" ]]; then
+bwkmrn=${kemarin3}
+else
+bwkmrn=${kemarin2}
+fi
+if [[ $bwkmrn == "" ]]; then
+bwkmrn1="NEWVPS "
+else
+bwkmrn1=${bwkmrn}
+fi
+
+hariini2=$(printf '%s\n' "$vn_d" | grep -w "${hariini}"  | awk '{print $8" "substr ($9 ,1 ,1) substr ($9 ,3 ,1)}')
+hariini3=$(printf '%s\n' "$vn_d" | grep -w "${hariini1}" | awk '{print $8" "substr ($9 ,1 ,1) substr ($9 ,3 ,1)}')
+if [[ $hariini2 == "" ]]; then
+bwhari=${hariini3}
+else
+bwhari=${hariini2}
+fi
+
+bulan2=$(printf '%s\n' "$vn_m" | grep -w "${bulan}"  | awk '{print $9" "substr ($10 ,1 ,1) substr ($10 ,3 ,1)}')
+bulan3=$(printf '%s\n' "$vn_m" | grep -w "${bulan1}" | awk '{print $8" "substr ($9 ,1 ,1) substr ($9 ,3 ,1)}')
+if [[ $bulan2 == "" ]]; then
+bwbln=${bulan3}
+else
+bwbln=${bulan2}
+fi
+
+# ping dibuat cepat (maks 2 detik)
+ping_ms="$(ping -c 1 -W 2 google.com 2>/dev/null | grep 'time=' | awk -F'time=' '{print $2}' | awk '{print $1}')"
+[[ -z "$ping_ms" ]] && ping_ms="0"
+
+function rif_Banner() {
+clear
+echo -e "\e[1;96m┌─────────────────────────────────────────────────┐\e[0m"
+echo -e "\033[96;1m│             \e[36m.::.\033[0m \033[0;35m  SCRIPT TUNNEL \033[0m \e[36m.::.\033[0m           \033[96;1m │\e[0m"
+echo -e "\e[1;96m└─────────────────────────────────────────────────┘\e[0m"
+}
+
+function Service_System_Operating() {
+echo -e "${z}┌─────────────────────────────────────────────────┐\033[0m "
+echo -e "${z}│${NC} \e[36mSYSTEM          : $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')     \033[0m "
+echo -e "${z}│${NC} \e[36mRAM             : $(free -m | awk 'NR==2 {print $2}')    \033[0m "
+echo -e "${z}│${NC} \e[36mUPTIME          : $(uptime -p | cut -d " " -f 2-10)\033[0m "
+echo -e "${z}│${NC} \e[36mIP VPS          : ${MYIP}     \033[0m "
+echo -e "${z}│${NC} \e[36mCITY            : ${CITY}    \033[0m "
+echo -e "${z}│${NC} \e[36mISP             : ${ISP}    \033[0m "
+echo -e "${z}│${NC} \e[36mDOMAIN          : ${domain}    \033[0m "
+echo -e "${z}│${NC} \e[36mYOUR PING       : ${ping_ms} ms    \033[0m"
+echo -e "${z}└─────────────────────────────────────────────────┘\033[0m"
+}
+
+function Service_Status() {
+echo -e "\033[96;1m┌─────────────────────────────────────────────────┐\033[0m "
+echo -e "\033[96;1m|\e[0m \e[36mPROXY :\e[0m $status_haproxy \e[96;1m|\e[0m \e[0m \e[36mNGINX :\e[0m $status_nginx \e[96;1m|\e[0m \e[0m \e[36mXRAY :\e[0m $status_xray \e[0m| $status_dropbear  \e[96;1m  | \e[0m "
+echo -e "\033[96;1m└─────────────────────────────────────────────────┘\033[0m "
+}
+
+function List_All_Account() {
+echo -e "${z}     ┌───────────────────────────────────────┐\033[0m "
+echo -e "              \e[36mSSH OPENVPN    :     $ssh1         \033[0m "
+echo -e "              \e[36mVLESS XRAY     :     $vla          \033[0m "
+echo -e "              \e[36mVMESS XRAY     :     $vma          \033[0m "
+echo -e "              \e[36mTRJAN XRAY     :     $trb          \033[0m "
+echo -e "              \e[36mSSR-LIBEV      :     $ssa          \033[0m "
+echo -e "${z}     └───────────────────────────────────────┘\033[0m "
+}
+
+function Details_Clients_Name() {
+echo -e "${z}   ┌───────────────────────────────────────────┐\033[0m "
+echo -e "${z}   │${NC}  \e[36mVERSION     : ${BLUE}4.0 LTS \033[0m "
+echo -e "${z}   │${NC}  \e[36mCLIENTS     :\033[0m\033[92;1m $(cat /usr/bin/user)   \033[0m "
+echo -e "${z}   │${NC}  \e[36mExpiry In   :\033[0m\033[92;1m $masaaktif  \033[0m "
+echo -e "${z}   └───────────────────────────────────────────┘\033[0m "
+}
+
+function Details_Bw_Clients() {
+echo -e "${z}   ┌───────────────────────────────────────────┐\033[0m "
+
+function center_text() {
+    local text="$1"
+    local width=50  # Sesuaikan dengan panjang baris yang diinginkan
+    local plain_text=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+    local len=${#plain_text}
+    local spaces=$(( (width - len) / 2 ))
+    printf "%${spaces}s%s\033[0m\n" "" "$(echo -e "$text")"
+}
+
+formatted_text="\e[36mKEMARIN  |  HARI INI  |  BULANAN\033[0m"
+formatted_text1="\033[91;1m${bwkmrn1}   ${bwhari}     ${bwbln}\033[0m"
+center_text "$formatted_text"
+center_text "$formatted_text1"
+echo -e "${z}   └───────────────────────────────────────────┘\033[0m "
+}
+
+function Acces_Use_Command() {
+echo -e "${z} —————————————————————————————————————————————————${NC}"
+echo -e "${z}         Press Enter to access the menu...       ${NC} "
+echo -e "${z} —————————————————————————————————————————————————${NC}"
+  read -p ""
+  menu
+}
+
+rif_Banner
+Service_System_Operating
+Service_Status
+List_All_Account
+Details_Clients_Name
+Details_Bw_Clients
+Acces_Use_Command

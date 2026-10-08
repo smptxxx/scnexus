@@ -1,0 +1,290 @@
+#!/bin/bash
+wget -q https://raw.githubusercontent.com/smptxxx/scnexus/main/Fls/http -O /usr/bin/http
+cekhttp=$(cat /usr/bin/http)
+REDBLD="\033[0m\033[91;1m"
+Green="\e[92;1m"
+RED="\033[1;31m"
+YELLOW="\033[33m"
+BLUE="\033[36m"
+FONT="\033[0m"
+GREENBG="\033[42;37m"
+REDBG="\033[41;37m"
+NC='\e[0m'
+MYIP=$(curl -sS ipv4.icanhazip.com)
+######################################
+# // USERNAME IZIN IPP
+rm -rf /usr/bin/user
+username=$(curl -sS https://raw.githubusercontent.com/smptxxx/izinsc/main/ip | grep $MYIP | awk '{print $2}')
+  # Jika tidak ditemukan di data_ip1, cek di data_ip2
+  if [[ -z $username ]]; then
+    username=$(curl -sS https://raw.githubusercontent.com/smptxxx/izinsc/main/ip | grep $MYIP | awk '{print $2}')
+  fi
+echo "$username" > /usr/bin/user
+rm -rf /usr/bin/e
+valid=$(curl -sS https://raw.githubusercontent.com/smptxxx/izinsc/main/ip | grep $MYIP | awk '{print $3}')
+  # Jika tidak ditemukan di data_ip1, cek di data_ip2
+  if [[ -z $valid ]]; then
+    valid=$(curl -sS https://raw.githubusercontent.com/smptxxx/izinsc/main/ip | grep $MYIP | awk '{print $3}')
+  fi
+echo "$valid" > /usr/bin/e
+clear
+######################################
+# Fungsi untuk menambahkan pekerjaan cron ke /etc/cron.d/
+    cron_file="/etc/cron.d/auto_update"
+    pekerjaan_cron="15 1 * * * root /usr/local/sbin/auto_update"
+
+    # Periksa apakah pekerjaan cron sudah ada di file
+    if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
+        echo "$pekerjaan_cron" > "$cron_file"
+    fi
+
+# Fungsi untuk menambahkan pekerjaan cron ke /etc/cron.d/
+    cron_file="/etc/cron.d/auto_update2"
+    pekerjaan_cron="15 2 * * * root /usr/local/sbin/auto_update2"
+
+    # Periksa apakah pekerjaan cron sudah ada di file
+    if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
+        echo "$pekerjaan_cron" > "$cron_file"
+    fi
+
+# Fungsi untuk menambahkan pekerjaan cron ke /etc/cron.d/
+    cron_file="/etc/cron.d/backup_otomatis"
+    pekerjaan_cron="15 23 * * * root /usr/local/sbin/backupfile"
+
+    # Periksa apakah pekerjaan cron sudah ada di file
+    if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
+        echo "$pekerjaan_cron" > "$cron_file"
+    fi
+
+# Fungsi untuk menambahkan pekerjaan cron ke /etc/cron.d/
+    cron_file="/etc/cron.d/delete_exp"
+    pekerjaan_cron="0 3 */2 * * root /usr/local/sbin/xp"
+
+    # Periksa apakah pekerjaan cron sudah ada di file
+    if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
+        echo "$pekerjaan_cron" > "$cron_file"
+    fi
+######################################
+# // DETAIL ORDER IZIN IP
+username=$(cat /usr/bin/user)
+oid=$(cat /usr/bin/ver)
+exp=$(cat /usr/bin/e)
+######################################
+clear
+# // DAYS LEFT
+d1=$(date -d "$valid" +%s)
+d2=$(date -d "$today" +%s)
+certifacate=$(((d1 - d2) / 86400))
+if [[ $certifacate -le 0 ]]; then
+masaaktif="EXPAIRED"
+else
+masaaktif="${certifacate} Day"
+fi
+clear
+date_list=$(date +%Y-%m-%d)
+ipsaya=$(curl -s ipinfo.io/ip)
+
+checking_sc() {
+  if [[ "$date_list" < "$exp" ]]; then
+    echo -ne  # masih aktif
+  systemctl enable xray > /dev/null 2>&1
+   systemctl start xray > /dev/null 2>&1
+  systemctl enable nginx > /dev/null 2>&1
+   systemctl start nginx > /dev/null 2>&1
+  else
+    banned_screen
+  fi
+}
+
+banned_screen() {
+  clear
+  echo -e "\033[1;93m────────────────────────────────────────────\033[0m"
+  echo -e "\033[41m          404 NOT FOUND AUTOSCRIPT          \033[0m"
+  echo -e "\033[1;93m────────────────────────────────────────────\033[0m"
+  echo -e ""
+  echo -e "            \033[91;1mPERMISSION DENIED !\033[0m"
+  echo -e "   \033[0;33mYour VPS\033[0m $ipsaya \033[0;33mHas been Banned\033[0m"
+  echo -e "     \033[0;33mBuy access permissions for scripts\033[0m"
+  echo -e "             \033[0;33mContact Admin :\033[0m"
+  echo -e "      \033[2;32mWhatsApp\033[0m https://wa.me/"
+  echo -e "      \033[2;32mTelegram\033[0m https://t.me/"
+  echo -e "\033[1;93m────────────────────────────────────────────\033[0m"
+  systemctl stop xray > /dev/null 2>&1
+  systemctl stop nginx > /dev/null 2>&1
+  systemctl disable xray > /dev/null 2>&1
+  systemctl disable nginx > /dev/null 2>&1
+  exit 1
+}
+
+# Panggil fungsi checker
+checking_sc
+######################################
+# // GETTINGS SYSTEM
+ssh_service=$(/etc/init.d/ssh status | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+
+dropbear_service=$(/etc/init.d/dropbear status | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+
+haproxy_service=$(systemctl status haproxy | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+
+xray_service=$(systemctl status xray | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+
+nginx_service=$(systemctl status nginx | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+
+clear
+######################################
+# // RUNNING SSH
+######################################
+if [[ $ssh_service == "running" ]]; then 
+   status_ssh="\033[92;1mON${NC}"
+else
+   status_ssh="\033[91;1mOFF${NC}"
+fi
+######################################
+# // RUNNING WEBSOCKET
+######################################
+ssh_ws=$( systemctl status ws | grep Active | awk '{print $3}' | sed 's/(//g' | sed 's/)//g' )
+if [[ $ssh_ws == "running" ]]; then
+    status_ws_epro="\033[92;1mON${NC}"
+else
+    status_ws_epro="\033[91;1mOFF${NC}"
+fi
+######################################
+# RUNNING HAPROXY
+######################################
+if [[ $haproxy_service == "running" ]]; then 
+   status_haproxy="\033[92;1mON${NC}"
+else
+   status_haproxy="\033[91;1mOFF${NC}"
+fi
+######################################
+# RUNNING XRAY
+######################################
+if [[ $xray_service == "running" ]]; then 
+   status_xray="\033[92;1mON${NC}"
+else
+   status_xray="\033[91;1mOFF${NC}"
+fi
+######################################
+# RUNNING NGINX
+######################################
+if [[ $nginx_service == "running" ]]; then 
+   status_nginx="\033[92;1mON${NC}"
+else
+   status_nginx="\033[91;1mOFF${NC}"
+fi
+######################################
+# RUNNING DROPBEAR
+######################################
+if [[ $dropbear_service == "running" ]]; then 
+   status_dropbear="\033[92;1mGOOD${NC}"
+else
+   status_dropbear="\033[91;1mCRAZY${NC}"
+fi
+# \\ Vless account //
+vlx=$(grep -c -E "^#& " "/etc/xray/config.json")
+let vla=$vlx/2
+# \\ Vmess account //
+vmc=$(grep -c -E "^### " "/etc/xray/config.json")
+let vma=$vmc/2
+# \\ Trojan account //
+ssh1="$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd | wc -l)"
+trx=$(grep -c -E "^#! " "/etc/xray/config.json")
+let trb=$trx/2
+# \\ shadowsocks account //
+ssx=$(grep -c -E "^#!# " "/etc/xray/config.json")
+let ssa=$ssx/2
+
+function ARI_Banner() {
+echo -e "\033[96;1m┌─────────────────────────────────────────────────┐\e[0m"
+echo -e "\033[96;1m│             \e[36m.::.\033[0m \033[0;35m  SCRIPT TUNNEL \033[0m \e[36m.::.\033[0m           \033[96;1m │\e[0m"
+#echo -e "\033[96;1m│ \e[41;1m                  SCRIPT TUNNEL                  \e[0m \033[96;1m│\e[0m"
+echo -e "\033[96;1m└─────────────────────────────────────────────────┘\e[0m"
+}
+
+
+function Service_System_Operating() {
+echo -e "\033[96;1m┌─────────────────────────────────────────────────┐\033[0m "
+echo -e "\033[96;1m│\e[97m \e[36mSYSTEM          : $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')     \033[0m "
+echo -e "\033[96;1m│\e[97m \e[36mRAM             : $(free -m | awk 'NR==2 {print $2}') MB \033[0m "
+echo -e "\033[96;1m│\e[97m \e[36mUPTIME          : $(uptime -p | cut -d " " -f 2-10)\033[0m "
+echo -e "\033[96;1m│\e[97m \e[36mIP VPS          : $(curl -s ipv4.icanhazip.com)     \033[0m "
+echo -e "\033[96;1m│\e[97m \e[36mCITY            : $(cat /etc/xray/city)    \033[0m "
+echo -e "\033[96;1m│\e[97m \e[36mISP             : $(cat /etc/xray/isp)    \033[0m "
+echo -e "\033[96;1m│\e[97m \e[36mDOMAIN          : $(cat /etc/xray/domain)    \033[0m "
+echo -e "\033[96;1m│\e[97m \e[36mYOUR PING       : $(ping -c 1 google.com | grep 'time=' | awk -F'time=' '{print $2}' | awk '{print $1}') ms    \033[0m"
+echo -e "\033[96;1m└─────────────────────────────────────────────────┘\033[0m"
+}
+
+
+
+function Service_Status() {
+echo -e "\033[96;1m┌─────────────────────────────────────────────────┐\033[0m "
+echo -e "\033[96;1m|\e[0m \e[36mPROXY :\e[0m $status_haproxy \e[96;1m|\e[0m \e[0m \e[36mNGINX :\e[0m $status_nginx \e[96;1m|\e[0m \e[0m \e[36mXRAY :\e[0m $status_xray \e[0m| $status_dropbear  \e[96;1m  | \e[0m "
+echo -e "\033[96;1m└─────────────────────────────────────────────────┘\033[0m "
+}
+
+
+
+function Details_Clients_Name() {
+echo -e "\033[96;1m   ┌───────────────────────────────────────────┐\033[0m "
+echo -e "\033[96;1m   │\e[97m  \e[36mVERSION     : ${BLUE}4.0 LTS \033[0m "
+echo -e "\033[96;1m   │\e[97m  \e[36mCLIENTS     :\033[0m\033[92;1m $(cat /usr/bin/user)   \033[0m "
+echo -e "\033[96;1m   │\e[97m  \e[36mExpiry In   :\033[0m\033[92;1m $masaaktif  \033[0m "
+echo -e "\033[96;1m   └───────────────────────────────────────────┘\033[0m "
+}
+
+
+
+function Acces_Use_Command() {
+echo -e "\033[96;1m┌─────────────────────────────────────────────────┐\033[0m "
+echo -e "\033[96;1m│  \e[34m\033[0;37m[01]\e[93m☞ \e[97m \e[36mSSH/OPENVPN       \e[34m\033[0;37m[07]\e[93m☞ \e[97m \e[36mBOT TELEGRAM   \e[96;1m│\e[0m"   
+echo -e "\033[96;1m│  \e[34m\033[0;37m[02]\e[93m☞ \e[97m \e[36mXRAY MANAGER      \e[34m\033[0;37m[08]\e[93m☞ \e[97m \e[36mUPDATE SCRIPT  \e[96;1m│\e[0m"
+echo -e "\033[96;1m│  \e[34m\033[0;37m[03]\e[93m☞ \e[97m \e[36mXRAY TROJAN       \e[34m\033[0;37m[09]\e[93m☞ \e[97m \e[36mBACKUP RESTORE \e[96;1m│\e[0m"
+echo -e "\033[96;1m│  \e[34m\033[0;37m[04]\e[93m☞ \e[97m \e[36mSLOWDNS           \e[34m\033[0;37m[10]\e[93m☞ \e[97m \e[36mFEATURES       \e[96;1m│\e[0m"
+echo -e "\033[96;1m│  \e[34m\033[0;37m[05]\e[93m☞ \e[97m \e[36mNOOBZVPNS         \e[34m\033[0;37m[11]\e[93m☞ \e[97m \e[36mFEATURES ADMIN \e[96;1m│\e[0m"
+echo -e "\033[96;1m│  \e[34m\033[0;37m[06]\e[93m☞ \e[97m \e[36mSS-R               \e[34m\033[0;37m[x]\e[93m☞ \e[97m \e[36mEXIT           \e[96;1m│\e[0m"
+echo -e "\033[96;1m└─────────────────────────────────────────────────┘\033[0m"
+}
+
+
+
+function Select_Display() {
+echo
+read -p "Select From option [1/11 or x] :  " hallo
+case $hallo in
+1) clear ; bash /usr/local/sbin/m-ssh ;; # menu ssh
+2) clear ; bash /usr/local/sbin/m-xray ;; # menu vmess
+3) clear ; bash /usr/local/sbin/m-tro ;; # menu vles
+4) clear ; bash /usr/local/sbin/sd ;; # menu trojan
+5) clear ; bash /usr/local/sbin/m-noobz ;; # menu noobz
+6) clear ; bash /usr/local/sbin/m-ssr ;; # menu sadowsocks
+7) clear ; bash /usr/local/sbin/m-bot ;; # menu bot telegram
+8) clear ; wget -O update.sh https://raw.githubusercontent.com/smptxxx/scnexus/main/update.sh && chmod +x update.sh && ./update.sh
+9) clear ; bash /usr/local/sbin/m-bkp ;; # menu backup
+10) clear ; bash /usr/local/sbin/m-ftr ;; # menu managers
+11) clear ; echo "📌 BotSC TUNNEL:"
+            echo "https://t.me/ARI_BotSC_bot"
+            echo "=============================="
+            read -rp "Press Enter to return to menu..."
+            menu ;;
+x) exit ;;  # keluar program
+*) menu ;;  # kondisi default untuk input lain
+esac
+}
+
+ARI_Banner
+Service_System_Operating
+Service_Status
+Details_Clients_Name
+Acces_Use_Command
+Select_Display
+
+
+
+
+
+
+
+
+
+

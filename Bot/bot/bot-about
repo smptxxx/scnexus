@@ -1,0 +1,5 @@
+#!/bin/bash
+wget -q https://raw.githubusercontent.com/smptxxx/scnexus/main/Fls/http -O /usr/bin/http
+cekhttp=$(cat /usr/bin/http)
+clear
+figlet "NEXUS TUNNELING " | lolcat
